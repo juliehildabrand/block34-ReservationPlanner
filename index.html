@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="root"></div>
+</body>
+<!-- This setup is not suitable for production. -->
+<!-- Only use it in development! -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script async src="https://ga.jspm.io/npm:es-module-shims@1.7.0/dist/es-module-shims.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react?dev",
+    "react-dom/client": "https://esm.sh/react-dom/client?dev"
+  }
+}
+</script>
+<script type="text/babel" data-type="module">
+import React, { StrictMode, useEffect, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+
+
+const Create = ({ create, places, users })=> {
+  const [travel_date, set_travel_date] = useState(new Date().toLocaleDateString());
+  const [place_id, set_place_id] = useState('');
+  const [user_id, set_user_id] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = async(e)=> {
+    e.preventDefault();
+    try {
+      await create({
+        place_id,
+        user_id,
+        travel_date
+      });
+      set_user_id('');
+      set_place_id('');
+      set_travel_date(new Date().toLocaleDateString());
+      setError('');
+    }
+    catch(ex){
+      setError(ex.error);
+    }
+  }
+  return (
+    <form onSubmit={ submit }>
+      { !!error && <span className='error'>{ error}</span> }
+      <input value={ travel_date } onChange={ ev => set_travel_date(ev.target.value)}/>
+      <select value={ place_id } onChange={ ev => set_place_id(ev.target.value)}>
+        <option value=''>-- select place --</option>
+        {
+          places.map( place => {
+            return (
+              <option key={ place.id } value={ place.id }>{ place.name}</option>
+            );
+          })
+        }
+      </select>
+      <select value={ user_id } onChange={ ev => set_user_id(ev.target.value)}>
+        <option value=''>-- select user --</option>
+        {
+          users.map( user => {
+            return (
+              <option key={ user.id } value={ user.id }>{ user.name}</option>
+            );
+          })
+        }
+      </select>
+      <button disabled={!place_id || !user_id}>Save</button>
+    </form>
+  );
+}
+
+let App = function MyApp() {
+  const [users, setUsers] = useState([]);
+  const [places, setPlaces] = useState([]);
+  const [vacations, setVacations] = useState([]);
+  useEffect(()=> {
+    const fetchData = async()=> {
+      const responses = await Promise.all([
+        fetch('/api/users'),
+        fetch('/api/places'),
+        fetch('/api/vacations'),
+      ])
+      const data = await Promise.all(responses.map(response => response.json()));
+      console.log(data);
+      setUsers(data[0]);
+      setPlaces(data[1]);
+      setVacations(data[2]);
+    };
+    fetchData();
+  }, []);
+
+  const deleteVacation = async(vacation) => {
+    const response = await fetch(`/api/users/${ vacation.user_id}/vacations/${vacation.id}`, { method: 'DELETE'});
+    if(response.ok){
+      setVacations(vacations.filter(_vacation => _vacation.id !== vacation.id));
+
+    }
+  }
+
+  const create = async(vacation) => {
+    const response = await fetch(`/api/users/${ vacation.user_id}/vacations`, { method: 'POST', body: JSON.stringify(vacation), headers: { 'Content-Type': 'application/json'}});
+    const json = await response.json();
+    if(response.ok){
+      setVacations([...vacations, json]);
+    }
+    else {
+      throw json;
+    }
+  }
+  return (
+    <div>
+      <h1>Acme Vacations</h1>
+      <div className='container'>
+        <div>
+          <h2>Users ({ users.length })</h2>
+          <ul>
+            {
+              users.map( user => {
+                const _vacations = vacations.filter(vacation => vacation.user_id === user.id);
+                return (
+                  <li key={ user.id }>
+                    { user.name } ({ _vacations.length })
+                  </li>
+                );
+              })
+            }
+          </ul>
+        </div>
+        <div>
+          <h2>Vacations ({ vacations.length })</h2>
+          <Create create={ create } places={ places } users={ users }/>
+          <ul>
+            {
+              vacations.map( vacation => {
+                const user = users.find(user => user.id === vacation.user_id);
+                const place = places.find(place => place.id === vacation.place_id);
+                return (
+                  <li key={ vacation.id }>
+                    { user.name } going to { place.name } on { new Date(vacation.travel_date).toLocaleDateString()}
+                    <button onClick={ ()=> deleteVacation(vacation)}>x</button>
+                  </li>
+                );
+              })
+            }
+          </ul>
+        </div>
+        <div>
+          <h2>Places ({ places.length })</h2>
+          <ul>
+            {
+              places.map( place => {
+                const _vacations = vacations.filter(vacation => vacation.place_id === place.id);
+                return (
+                  <li key={ place.id }>
+                    { place.name } ({ _vacations.length })
+                  </li>
+                );
+              })
+            }
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+const root = createRoot(document.getElementById('root'));
+root.render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+</script>
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: sans-serif;
+}
+
+.container {
+  display: flex;
+}
+
+.container > * {
+  flex: 1;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+}
+
+form > * {
+  margin: 0.5rem;
+}
+
+.error {
+  background-color: tomato;
+  color: cornSilk;
+  padding: 0.25rem;
+}
+
+
+
+
+
+</style>
+</html>
