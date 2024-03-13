@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const app = express();
 
 app.use(morgan('dev'));
+app.use(express.json());
 
 app.get('/api/customers', async(req, res, next)=> {
   try{
@@ -31,6 +32,29 @@ app.get('/api/reservations', async(req, res, next)=> {
   catch(error){
     next(error);
   }
+});
+
+app.delete('/api/customers/:customerId/reservations/:id', async(req, res, next)=> {
+  try{
+    await destroyReservation({ id: req.params.id, customer_id: req.params.customerId});
+    res.sendStatus(204);
+  }
+  catch(error){
+    next(error);
+  }
+});
+
+app.post('/api/customers/:id/reservations', async(req, res, next)=> {
+  try {
+    res.status(201).send(await createReservation({ customer_id: req.params.id, restaurant_id: req.body.restaurant_id, dinner_date: req.body.dinner_date}));
+  }
+  catch(error){
+    next(error);
+  }
+});
+
+app.use((err, req, res, next)=> {
+  res.status(err.status || 500).send({error: err.message || err});
 });
 
 const init = async ()=> {
@@ -64,8 +88,11 @@ const init = async ()=> {
   app.listen(port, ()=> {
     console.log(`listening on port ${port}`)
     //use curl to test out the app via console.logs
-
-
+    console.log(`curl localhost:${port}/api/customers`);
+    console.log(`curl localhost:${port}/api/restaurants`);
+    console.log(`curl localhost:${port}/api/reservations`);
+    console.log(`curl -X DELETE localhost:${port}/api/customers/${chandler.id}/reservations/${reservations[0].id}`);
+    console.log(`curl -X POST localhost:${port}/api/customers/${chandler.id}/reservations -d '{"dinner_date": "03/15/2024", "restaurant_id": "${alessandros.id}"}' -H "Content-Type:application/json"`);
   });
 
 }

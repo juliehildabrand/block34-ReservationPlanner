@@ -83,7 +83,18 @@ const fetchReservations = async()=> {
 };
 
 const destroyReservation = async({ id, customer_id })=> {
-  const SQL = `
+  let SQL = `
+    SELECT *
+    FROM reservations
+    WHERE id = $1 AND customer_id = $2
+  `;
+  const response = await client.query(SQL, [id, customer_id]);
+  if(!response.rows.length){
+    const error = Error('no record found');
+    error.status = 500;
+    throw error;
+  }
+  SQL = `
     DELETE FROM
     reservations
     WHERE id = $1 AND customer_id = $2
